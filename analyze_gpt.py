@@ -3,20 +3,18 @@ from openai import OpenAI
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-def analyze_post(title, text):
+def analyze_problem(problem_text):
     prompt = f"""
-    פוסט מרדיט:
-    כותרת: {title}
-    תוכן: {text}
+    בעיה פופולרית:
+    {problem_text}
 
-    1. מה הבעיה העיקרית שהפוסט מתאר?
-    2. הצע 3 מוצרים פיזיים שאפשר למכור (דרופשיפינג) שיכולים לפתור את הבעיה.
-    3. עבור כל מוצר, הסבר בקצרה למה הוא פותר את הבעיה.
+    הצע 3 מוצרים פיזיים שאפשר למכור בדרופשיפינג שיכולים לפתור את הבעיה.
+    הסבר בקצרה לכל מוצר למה הוא פותר את הבעיה.
     הפלט בעברית.
     """
-    response = client.chat.completions.create(
+    resp = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.7
     )
-    return response.choices[0].message.content.strip()
+    return resp.choices[0].message.content.strip()
