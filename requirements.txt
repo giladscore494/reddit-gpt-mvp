@@ -1,6 +1,7 @@
-praw
-openai>=1.0.0
-pandas
 streamlit
+praw
+pandas
+openai>=1.0.0
 requests
+beautifulsoup4
 pytrends
