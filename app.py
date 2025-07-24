@@ -7,20 +7,50 @@ from merge_and_filter import merge_and_filter
 from analyze_gpt import analyze_problem
 from calc_roi import calculate_roi
 
+# כותרת האפליקציה
 st.title("Multi-Source Problem Finder → Product Ideas")
 
-keyword = st.text_input("מה הבעיה או התחום שתרצה לחפש?", "problem")
+# רשימת בעיות פופולריות (נשים)
+popular_keywords = [
+    "skin care problems",
+    "hair loss",
+    "hormonal acne",
+    "weight loss issues",
+    "period pain",
+    "anxiety",
+    "relationship problems",
+    "postpartum issues",
+    "sleep problems",
+    "self-care burnout"
+]
+
+# שורת חיפוש
+keyword = st.text_input("מה הבעיה או התחום שתרצה לחפש?", "")
 
 if st.button("Collect & Analyze"):
-    st.write(f"מחפש בעיות עם מילת מפתח: **{keyword}** ...")
-
-    # שליפת נתונים (ללא טוויטר)
-    reddit_df = fetch_reddit_posts(["BuyItForLife", "LifeProTips"], days=7)
-    trends_df = fetch_google_trends()
-    tiktok_df = fetch_websearch(keyword, site="tiktok.com")
-    quora_df = fetch_websearch(keyword, site="quora.com")
-
-    combined = merge_and_filter([reddit_df, trends_df, tiktok_df, quora_df])
+    if keyword.strip() == "":
+        st.info("לא הוזנה מילת חיפוש, מבצע חיפוש לפי נושאים פופולריים אצל נשים...")
+        combined_list = []
+        for kw in popular_keywords:
+            st.write(f"**חיפוש לפי מילת מפתח:** {kw}")
+            reddit_df = fetch_reddit_posts(["BuyItForLife", "LifeProTips"], days=7)
+            trends_df = fetch_google_trends()
+            tiktok_df = fetch_websearch(kw, site="tiktok.com")
+            quora_df = fetch_websearch(kw, site="quora.com")
+            # Debug output
+            st.write(f"Reddit results: {len(reddit_df)}, Trends: {len(trends_df)}, TikTok: {len(tiktok_df)}, Quora: {len(quora_df)}")
+            merged = merge_and_filter([reddit_df, trends_df, tiktok_df, quora_df])
+            combined_list.append(merged)
+        combined = pd.concat(combined_list).drop_duplicates()
+    else:
+        st.write(f"מחפש בעיות עם מילת מפתח: **{keyword}** ...")
+        reddit_df = fetch_reddit_posts(["BuyItForLife", "LifeProTips"], days=7)
+        trends_df = fetch_google_trends()
+        tiktok_df = fetch_websearch(keyword, site="tiktok.com")
+        quora_df = fetch_websearch(keyword, site="quora.com")
+        # Debug output
+        st.write(f"Reddit results: {len(reddit_df)}, Trends: {len(trends_df)}, TikTok: {len(tiktok_df)}, Quora: {len(quora_df)}")
+        combined = merge_and_filter([reddit_df, trends_df, tiktok_df, quora_df])
 
     if combined.empty:
         st.warning("לא נמצאו בעיות כלל (נסה מילת חיפוש אחרת)")
