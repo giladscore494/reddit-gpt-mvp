@@ -2,3 +2,4 @@ praw
 openai
 pandas
 streamlit
+openai>=1.0.0
