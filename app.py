@@ -8,28 +8,42 @@ from merge_and_filter import merge_and_filter
 from analyze_gpt import analyze_problem
 from calc_roi import calculate_roi
 
+# כותרת האפליקציה
 st.title("Multi-Source Problem Finder → Product Ideas")
 
-if st.button("Collect & Analyze"):
-    reddit_df = fetch_reddit_posts(["BuyItForLife","LifeProTips"], days=7)
-    twitter_df = fetch_twitter("problem", days=7)
-    trends_df = fetch_google_trends()
-    tiktok_df = fetch_websearch("problem", site="tiktok.com")
-    quora_df = fetch_websearch("problem", site="quora.com")
+# שורת חיפוש חופשית
+keyword = st.text_input("מה הבעיה או התחום שתרצה לחפש?", "problem")
 
+if st.button("Collect & Analyze"):
+    st.write(f"מחפש בעיות עם מילת מפתח: **{keyword}** ...")
+
+    # איסוף נתונים ממקורות מרובים
+    reddit_df = fetch_reddit_posts(["BuyItForLife", "LifeProTips"], days=7)
+    twitter_df = fetch_twitter(keyword, days=7)
+    trends_df = fetch_google_trends()
+    tiktok_df = fetch_websearch(keyword, site="tiktok.com")
+    quora_df = fetch_websearch(keyword, site="quora.com")
+
+    # מיזוג וסינון בעיות פופולריות
     combined = merge_and_filter([reddit_df, twitter_df, trends_df, tiktok_df, quora_df])
-    results = []
-    for _, row in combined.iterrows():
-        solution = analyze_problem(row["text_clean"])
-        sell_price, roi = calculate_roi(10)
-        results.append({
-            "problem": row["title"],
-            "sources": ", ".join(row["source"]),
-            "products_solutions": solution,
-            "cost_price": 10,
-            "sell_price": sell_price,
-            "roi_percent": roi
-        })
-    output_df = pd.DataFrame(results)
-    st.write(output_df)
-    st.download_button("Download CSV", output_df.to_csv(index=False), "output.csv")
+
+    if combined.empty:
+        st.warning("לא נמצאו בעיות פופולריות עם מילת המפתח הזאת.")
+    else:
+        results = []
+        for _, row in combined.iterrows():
+            solution = analyze_problem(row["text_clean"])
+            sell_price, roi = calculate_roi(10)
+            results.append({
+                "problem": row["title"],
+                "sources": ", ".join(row["source"]),
+                "products_solutions": solution,
+                "cost_price": 10,
+                "sell_price": sell_price,
+                "roi_percent": roi
+            })
+
+        output_df = pd.DataFrame(results)
+        st.write("### תוצאות:")
+        st.write(output_df)
+        st.download_button("Download CSV", output_df.to_csv(index=False), "output.csv")
