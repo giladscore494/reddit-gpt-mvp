@@ -4,9 +4,10 @@ from fetch_reddit import fetch_reddit_posts
 from analyze_gpt import analyze_post
 from calc_roi import calculate_roi
 
-st.title("Reddit → GPT → ROI Demo")
+st.title("Reddit → GPT → Product Ideas (Dropshipping)")
 
-subreddit = st.text_input("Enter Subreddit", "fashion")
+subreddit = st.text_input("Enter Subreddit", "AskReddit")
+
 if st.button("Run Analysis"):
     df = fetch_reddit_posts([subreddit])
     results = []
@@ -15,7 +16,7 @@ if st.button("Run Analysis"):
         sell_price, roi = calculate_roi(10)
         results.append({
             "title": row["title"],
-            "solutions": analysis,
+            "products_solutions": analysis,
             "cost_price": 10,
             "sell_price": sell_price,
             "roi_percent": roi
