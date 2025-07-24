@@ -1,34 +1,29 @@
 import streamlit as st
 import pandas as pd
 from fetch_reddit import fetch_reddit_posts
-from fetch_twitter import fetch_twitter
 from fetch_google_trends import fetch_google_trends
 from fetch_websearch import fetch_websearch
 from merge_and_filter import merge_and_filter
 from analyze_gpt import analyze_problem
 from calc_roi import calculate_roi
 
-# כותרת האפליקציה
 st.title("Multi-Source Problem Finder → Product Ideas")
 
-# שורת חיפוש חופשית
 keyword = st.text_input("מה הבעיה או התחום שתרצה לחפש?", "problem")
 
 if st.button("Collect & Analyze"):
     st.write(f"מחפש בעיות עם מילת מפתח: **{keyword}** ...")
 
-    # איסוף נתונים ממקורות מרובים
+    # שליפת נתונים (ללא טוויטר)
     reddit_df = fetch_reddit_posts(["BuyItForLife", "LifeProTips"], days=7)
-    twitter_df = fetch_twitter(keyword, days=7)
     trends_df = fetch_google_trends()
     tiktok_df = fetch_websearch(keyword, site="tiktok.com")
     quora_df = fetch_websearch(keyword, site="quora.com")
 
-    # מיזוג וסינון בעיות פופולריות
-    combined = merge_and_filter([reddit_df, twitter_df, trends_df, tiktok_df, quora_df])
+    combined = merge_and_filter([reddit_df, trends_df, tiktok_df, quora_df])
 
     if combined.empty:
-        st.warning("לא נמצאו בעיות פופולריות עם מילת המפתח הזאת.")
+        st.warning("לא נמצאו בעיות כלל (נסה מילת חיפוש אחרת)")
     else:
         results = []
         for _, row in combined.iterrows():
