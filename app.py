@@ -9,22 +9,24 @@ from fetch_google_link import search_aliexpress
 
 st.title("Multi-Source Problem Finder → Product Ideas (Optimized)")
 
-# קלט משתמש
 keyword = st.text_input("מה הבעיה או התחום שתרצה לחפש?", "")
+
 if st.button("Collect & Analyze"):
     if not keyword.strip():
         st.warning("אנא הזן מילה או תחום לחיפוש.")
     else:
         st.write(f"מחפש בעיות עם מילת מפתח: **{keyword}** ...")
 
-        # --- שלב 1: GPT → תרגום + תתי נושאים ---
+        # --- GPT שלב ראשון: תתי נושאים ---
         subtopics = analyze_topics_and_problems(keyword)
-        st.write(f"**תתי נושאים לחיפוש:** {', '.join(subtopics)}")
+        st.write(f"תתי נושאים לחיפוש: {', '.join(subtopics)}")
 
-        # --- שלב 2: איסוף פוסטים ממוקד (מוגבל) ---
+        # --- איסוף מידע מכל הפלטפורמות ---
         all_posts = []
         for topic in subtopics:
-            reddit_df = fetch_reddit_posts(["BuyItForLife", "LifeProTips"], keyword=topic, days=7, limit=5)
+            reddit_df = fetch_reddit_posts(
+                ["BuyItForLife", "LifeProTips"], keyword=topic, days=7, limit=5
+            )
             trends_df = fetch_google_trends(topic)
             quora_df = fetch_websearch(topic, site="quora.com", limit=3)
             tiktok_df = fetch_websearch(topic, site="tiktok.com", limit=3)
@@ -38,15 +40,17 @@ if st.button("Collect & Analyze"):
         else:
             st.write(f"נמצאו {len(combined)} פוסטים לניתוח.")
 
-            # --- שלב 3: GPT → מציאת בעיות חוזרות ---
-            problems = analyze_topics_and_problems(keyword, combined["text_clean"].tolist(), mode="problems")
+            # --- GPT שלב שני: בעיות חוזרות ---
+            problems = analyze_topics_and_problems(
+                keyword, combined["text_clean"].tolist(), mode="problems"
+            )
             st.write("**בעיות חוזרות שזוהו:**", problems)
 
-            # --- שלב 4: GPT → פתרונות ומוצרים ---
+            # --- GPT שלב שלישי: פתרונות ---
             solutions = analyze_solutions(problems)
             st.write("**GPT raw output:**", solutions)
 
-            # --- שלב 5: הפקת 3 מוצרים בלבד + לינקים ---
+            # --- הצגת מוצרים (3 בלבד) עם קישורים ---
             rows = []
             for solution in solutions:
                 product_name = solution["product"]
