@@ -5,31 +5,38 @@ import streamlit as st
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-def fetch_weekly_problems():
+def fetch_top3_products_by_topic(user_topic):
     """
-    מחזיר רשימת 10 בעיות פופולריות מהשבוע האחרון
-    שאפשר לפתור עם מוצר מאלי אקספרס.
+    מקבל תחום כללי (כמו אופנה / ספורט / טכנולוגיה)
+    ומחזיר 3 מוצרים רלוונטיים ביותר לבעיות שעלו בשבוע האחרון.
     """
+    # --- חיפוש 3 נושאים חמים לפי Google Trends ---
     try:
         pytrends = TrendReq(hl='en-US', tz=360)
-        trending_today = pytrends.trending_searches(pn='united_states')
-        keywords = trending_today[0].tolist()[:10]
+        trending = pytrends.trending_searches(pn='united_states')
+        # סינון לנושאים הקשורים לתחום המשתמש
+        filtered = [t for t in trending[0].tolist() if user_topic.lower() in t.lower()][:3]
+        if len(filtered) < 3:
+            # fallback - פשוט לקחת 3 ראשונים
+            filtered = trending[0].tolist()[:3]
     except Exception:
-        return []
+        filtered = [f"{user_topic} issue {i}" for i in range(1, 4)]
 
+    # --- GPT אנלוגיה + פתרונות ---
     prompt = f"""
-    Given these trending topics: {keywords}
-    Identify if each represents a problem that can be solved by a product.
-    If not, skip it. 
-    For each valid problem, suggest one AliExpress product to solve it.
-    Output as JSON list of objects with keys: problem, product.
+    The topic is: {user_topic}.
+    Trending issues this week: {filtered}.
+    For each issue:
+    1. Summarize the main problem.
+    2. Suggest one AliExpress product that can best solve it.
+    Return only 3 results in format: problem | product.
     """
 
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.4
+            temperature=0.5
         )
         output_text = response.choices[0].message.content
     except Exception:
@@ -37,15 +44,17 @@ def fetch_weekly_problems():
 
     results = []
     for line in output_text.splitlines():
-        if "problem" in line.lower() and "product" in line.lower():
+        if "|" in line:
             try:
-                # חיתוך פשוט – בלי תלות בפורמט מדויק
-                parts = line.split("product:")
-                problem = parts[0].replace("problem:", "").strip()
-                product = parts[1].strip()
+                problem, product = line.split("|", 1)
+                problem, product = problem.strip(), product.strip()
                 link = search_aliexpress(product)
-                results.append({"problem": problem, "link": link})
+                results.append({
+                    "problem": problem,
+                    "product": product,
+                    "link": link
+                })
             except:
                 continue
 
-    return results
+    return results[:3]
