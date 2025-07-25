@@ -1,53 +1,49 @@
-import openai
 import streamlit as st
+from openai import OpenAI
 from deep_translator import GoogleTranslator
+from fetch_google_link import search_aliexpress
 
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-def translate_to_english(text):
-    try:
-        return GoogleTranslator(source='auto', target='en').translate(text)
-    except Exception:
-        return text
-
-def analyze_problem(problem_text):
+def analyze_and_find_products(df):
     """
-    מפענח בעיה כללית ומחזיר תובנה בסיסית
+    ניתוח בעיות והצעת מוצרים מאלי אקספרס
     """
-    translated = translate_to_english(problem_text)
+    text = "\n".join(df["text_clean"].tolist())
+    translated_text = GoogleTranslator(source='auto', target='en').translate(text)
+
     prompt = f"""
-    Identify the root issue described here and summarize it in one short sentence:
-    "{translated}"
+    Identify the top 3 recurring problems mentioned in the following text
+    and suggest the best AliExpress products to solve them.
+    Return results in JSON format with:
+    - problems: list of problems
+    - products: list of objects with keys [product, match, desc]
+    Text: {translated_text}
     """
-    response = openai.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3
-    )
-    return response.choices[0].message.content.strip()
 
-def analyze_and_find_products(problem_text):
-    """
-    מזהה פתרונות מוצרים אפשריים מעלי אקספרס ומדרג אותם לפי התאמה.
-    מחזיר רשימה עם מוצר, אחוז התאמה, ותיאור קצר.
-    """
-    translated = translate_to_english(problem_text)
-    prompt = f"""
-    The user described a problem: "{translated}".
-    Your task:
-    1. Suggest 3 concrete products that could solve this problem (physical items sold online, ideally from AliExpress).
-    2. Rank them by relevance (percent 0-100).
-    3. Provide a one-line reason for each.
-
-    Respond in JSON array format like:
-    [
-      {{"product": "Product Name", "match": 95, "reason": "Why it helps"}},
-      ...
-    ]
-    """
-    response = openai.chat.completions.create(
-        model="gpt-3.5-turbo",
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.4
     )
-    return response.choices[0].message.content.strip()
+
+    output_text = response.choices[0].message.content
+
+    # פענוח פשוט (ללא JSON מלא)
+    problems = []
+    products = []
+
+    for line in output_text.splitlines():
+        if "problem" in line.lower():
+            problems.append(line.strip())
+        if "product" in line.lower():
+            name = line.replace("product:", "").strip()
+            link = search_aliexpress(name)
+            products.append({
+                "product": name,
+                "match": 90,
+                "desc": "מוצר מתאים שנמצא",
+                "link": link
+            })
+
+    return problems, products
