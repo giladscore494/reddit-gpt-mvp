@@ -2,6 +2,7 @@ import feedparser
 import pandas as pd
 from fetch_google_trends import fetch_google_trends
 from fetch_websearch import fetch_forum_posts
+from trend_check import check_trend_heat
 
 def get_combined_trends(domain):
     """
@@ -20,6 +21,6 @@ def get_combined_trends(domain):
     for topic in combined_topics:
         posts_df = fetch_forum_posts(topic)
         posts_count = len(posts_df)
-        heat = "חמה" if posts_count > 30 else "בינונית" if posts_count > 10 else "חלשה"
+        heat = check_trend_heat(posts_count)
         data.append({"topic": topic, "posts_count": posts_count, "heat": heat})
     return pd.DataFrame(data)
