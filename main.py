@@ -1,27 +1,22 @@
-from fetch_reddit import fetch_reddit_posts
-from analyze_gpt import analyze_post
-from calc_roi import calculate_roi
-from save_to_csv import save_to_csv
+from daily_trends import get_combined_trends
+from analyze_gpt import analyze_problem
 import pandas as pd
 
-def main():
-    subreddits = ["fashion", "SkincareAddiction"]
-    df = fetch_reddit_posts(subreddits)
-
-    analyses = []
-    for _, row in df.iterrows():
-        analysis = analyze_post(row["title"], row["text"])
-        sell_price, roi = calculate_roi(10)  # מחיר עלות לדוגמה
-        analyses.append({
-            "title": row["title"],
-            "problem_solutions": analysis,
-            "cost_price": 10,
-            "sell_price": sell_price,
-            "roi_percent": roi
+def run(domain="טכנולוגיה"):
+    trends_df = get_combined_trends(domain)
+    results = []
+    for _, row in trends_df.iterrows():
+        product, link = analyze_problem(row["topic"])
+        results.append({
+            "בעיה": row["topic"],
+            "כמות פוסטים": row["posts_count"],
+            "דרגת חום": row["heat"],
+            "מוצר מוצע": product,
+            "קישור": link
         })
-
-    output_df = pd.DataFrame(analyses)
-    save_to_csv(output_df)
+    df = pd.DataFrame(results)
+    print(df)
+    df.to_csv("results.csv", index=False)
 
 if __name__ == "__main__":
-    main()
+    run()
