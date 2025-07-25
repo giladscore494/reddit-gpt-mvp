@@ -1,31 +1,36 @@
-import openai
 import streamlit as st
+from openai import OpenAI
 
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-def analyze_and_find_products(problem):
+def analyze_problem(problems_text):
     """
-    שולח את הבעיה ל-GPT ומבקש פתרונות מוצר עם התאמה ≥ 90%.
+    מקבל רשימת בעיות (טקסט) ומחזיר:
+    - בעיות מנותחות
+    - פתרונות מוצעים
+    - מוצרים עם התאמה ≥90% כולל קישור לאליאקספרס
     """
     prompt = f"""
-    הבעיה: "{problem}"
-    מצא מוצר אחד בלבד שיכול לפתור את הבעיה הזו וודא שהוא מוצר פיזי שניתן לקנות.
-    החזר פורמט JSON: 
-    [{{"product": "שם מוצר", "match": 95, "link": "https://www.aliexpress.com/wholesale?SearchText=שם מוצר באנגלית"}}]
+    ניתנה לך רשימת בעיות שחוזרות ברשת:
+    {problems_text}
+
+    1. זהה את שלוש הבעיות המרכזיות בלבד.
+    2. לכל בעיה הצע מוצר אחד בלבד מעלי אקספרס שיכול לפתור אותה עם התאמה ≥90%.
+    3. החזר את התשובה במבנה JSON בלבד:
+    [
+      {{
+        "problem": "שם הבעיה",
+        "product": "שם מוצר",
+        "link": "קישור אליאקספרס מדויק"
+      }}
+    ]
     """
 
-    try:
-        response = openai.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
-            temperature=0.4
-        )
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3
+    )
 
-        raw = response.choices[0].message["content"]
-        import json
-        products = json.loads(raw)
-        return products
-    except Exception as e:
-        print("Error in GPT product analysis:", e)
-        return []
+    content = response.choices[0].message.content.strip()
+    return content
