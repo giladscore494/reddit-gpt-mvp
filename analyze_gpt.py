@@ -5,23 +5,26 @@ client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 def analyze_problem(problem_text):
     prompt = f"""
-בעיה: {problem_text}
+    You are a product research assistant.
 
-אנא הצע 5 מוצרים פיזיים מדויקים מאליאקספרס שיכולים לפתור את הבעיה.
-לכל מוצר:
-1. שם מדויק (באנגלית, כפי שהוא מופיע בדרך כלל באליאקספרס).
-2. אחוז התאמה לבעיה (0–100%).
+    Task:
+    1. Find exactly 5 physical products from AliExpress that solve the problem: "{problem_text}".
+    2. All products must be highly relevant to this problem.
+    3. For each product, give:
+       - Exact product name (as found on AliExpress)
+       - Match score (0-100%)
 
-פורמט:
-מוצר 1: <שם מוצר> | התאמה: <אחוז>
-מוצר 2: <שם מוצר> | התאמה: <אחוז>
-מוצר 3: <שם מוצר> | התאמה: <אחוז>
-מוצר 4: <שם מוצר> | התאמה: <אחוז>
-מוצר 5: <שם מוצר> | התאמה: <אחוז>
-"""
-    resp = client.chat.completions.create(
+    Output format:
+    Product 1: <Product Name> | Match: <Score>%
+    Product 2: <Product Name> | Match: <Score>%
+    Product 3: <Product Name> | Match: <Score>%
+    Product 4: <Product Name> | Match: <Score>%
+    Product 5: <Product Name> | Match: <Score>%
+    """
+    response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.7
+        max_tokens=300,   # <<< מגבלת טוקנים
+        temperature=0.3
     )
-    return resp.choices[0].message.content.strip()
+    return response.choices[0].message.content.strip()
