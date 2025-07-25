@@ -1,30 +1,39 @@
 import streamlit as st
 import pandas as pd
-from fetch_reddit import fetch_reddit_posts
+from daily_trends import get_combined_trends
+from fetch_websearch import fetch_forum_posts
 from analyze_gpt import analyze_problem
 
-st.title("Reddit GPT MVP - בעיות ופתרונות")
+st.title("Trend → Product Finder")
 
-# בחירת נושא
-topic = st.text_input("הזן נושא לחיפוש:", "dropshipping")
+domain = st.text_input("הזן תחום כללי (לדוגמה: טכנולוגיה, אופנה, רכב)", "טכנולוגיה")
 
-if topic:
-    with st.spinner("טוען פוסטים מרדיט..."):
-        reddit_df = fetch_reddit_posts([topic], days=7)
-
-    if not reddit_df.empty:
-        st.subheader("פוסטים שנמצאו:")
-        st.dataframe(reddit_df)
-
-        st.subheader("ניתוח בעיות והצעת פתרונות")
-        products, links = [], []
-        for _, row in reddit_df.iterrows():
-            product, link = analyze_problem(row.title)
-            products.append(product)
-            links.append(link)
-
-        reddit_df["מוצר מומלץ"] = products
-        reddit_df["קישור"] = links
-        st.dataframe(reddit_df)
+if st.button("אתר טרנדים והצע מוצרים"):
+    with st.spinner("מזהה בעיות טרנדיות..."):
+        trends_df = get_combined_trends(domain)
+    if trends_df.empty:
+        st.warning("לא נמצאו נושאים חמים.")
     else:
-        st.warning("לא נמצאו פוסטים לנושא זה.")
+        st.subheader("נושאים חמים שנמצאו:")
+        st.dataframe(trends_df)
+
+        results = []
+        for _, row in trends_df.iterrows():
+            problem = row["topic"]
+            posts_count = row["posts_count"]
+            heat = row["heat"]
+
+            # ניתוח מוצר
+            product, link = analyze_problem(problem)
+            results.append({
+                "בעיה": problem,
+                "כמות פוסטים": posts_count,
+                "דרגת חום": heat,
+                "מוצר מוצע": product,
+                "קישור": link
+            })
+
+        st.subheader("תוצאות סופיות:")
+        results_df = pd.DataFrame(results)
+        st.dataframe(results_df)
+        st.download_button("הורד CSV", results_df.to_csv(index=False), "results.csv")
