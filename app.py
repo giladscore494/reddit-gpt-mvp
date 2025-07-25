@@ -32,8 +32,13 @@ if st.button("Collect & Analyze"):
         if combined.empty:
             st.warning("לא נמצאו בעיות עם מילת המפתח הזו.")
         else:
-            # --- ניתוח רק בעיה אחת (Top 1) כדי לחסוך בטוקנים ---
-            top_problem = combined.iloc[0]["text_clean"]
+            # --- חיפוש בעיות שרלוונטיות למילת החיפוש ---
+            filtered = combined[combined["text_clean"].str.contains(keyword, case=False, na=False)]
+            if not filtered.empty:
+                top_problem = filtered.iloc[0]["text_clean"]
+            else:
+                top_problem = keyword  # fallback – שולחים ישירות את מילת החיפוש ל-GPT
+
             st.write(f"### Top Problem Selected:\n{top_problem}")
 
             # --- קריאה ל-GPT ---
@@ -58,13 +63,13 @@ if st.button("Collect & Analyze"):
                         "problem": top_problem,
                         "product": product_name,
                         "match_percent": score,
-                        "aliexpress_link": f"[Link]({link})"
+                        "aliexpress_link": f"[AliExpress Link]({link})"
                     })
 
-            # --- הצגת פלט ---
+            # --- הצגת פלט (ללא tabulate) ---
             if results:
                 output_df = pd.DataFrame(results)
-                st.markdown(output_df.to_markdown(index=False), unsafe_allow_html=True)
+                st.dataframe(output_df)
                 st.download_button("Download CSV", output_df.to_csv(index=False), "output.csv")
             else:
                 st.warning("לא התקבלו מוצרים מתאימים.")
