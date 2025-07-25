@@ -4,13 +4,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 def fetch_reddit_posts(subreddits, keyword=None, days=7, limit=10):
-    """
-    שליפה ממוקדת מרדיט:
-    - subreddits: רשימת סאברים
-    - keyword: מילת מפתח (אופציונלית)
-    - days: כמה ימים אחורה למשוך
-    - limit: כמה פוסטים מקסימום
-    """
     reddit = praw.Reddit(
         client_id=st.secrets["REDDIT_CLIENT_ID"],
         client_secret=st.secrets["REDDIT_CLIENT_SECRET"],
@@ -22,7 +15,7 @@ def fetch_reddit_posts(subreddits, keyword=None, days=7, limit=10):
 
     for subreddit_name in subreddits:
         subreddit = reddit.subreddit(subreddit_name)
-        for post in subreddit.new(limit=50):  # משיכה ראשונית רחבה
+        for post in subreddit.new(limit=50):
             if post.created_utc < after_timestamp:
                 continue
 
