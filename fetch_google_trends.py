@@ -1,11 +1,17 @@
 from pytrends.request import TrendReq
 import pandas as pd
 
-def fetch_google_trends():
+def fetch_google_trends(keyword="fashion"):
     pytrends = TrendReq(hl='en-US', tz=360)
-    pytrends.build_payload(kw_list=["problem", "need help"], timeframe='now 7-d')
-    interest_over_time = pytrends.interest_over_time()
-    if interest_over_time.empty:
-        return pd.DataFrame()
-    topics = interest_over_time.mean().sort_values(ascending=False).head(5).index
-    return pd.DataFrame([{"source": "GoogleTrends", "title": kw, "text": kw, "url": ""} for kw in topics])
+    pytrends.build_payload([keyword], timeframe='now 7-d')
+
+    data = pytrends.interest_over_time()
+    data.reset_index(inplace=True)
+
+    score = int(data[keyword].mean()) if not data.empty else 0
+    return pd.DataFrame([{
+        "title": f"Google Trends for {keyword}",
+        "text": f"Interest over time last 7 days for {keyword}",
+        "score": score,
+        "text_clean": f"Google Trends interest for {keyword}"
+    }])
