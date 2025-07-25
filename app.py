@@ -1,26 +1,46 @@
+iimport streamlit as st
+import pandas as pd
+from fetch_reddit import fetch_reddit_posts
+from fetch_google_trends import fetch_google_trends
+from fetch_websearch import fetch_websearch
+from merge_and_filter import merge_and_filter
+from analyze_gpt import analyze_problem
+from fetch_google_link import search_aliexpress
+
+# --- כותרת האפליקציה ---
+st.title("Multi-Source Problem Finder → Product Ideas")
+
+# --- קלט מהמשתמש ---
+keyword = st.text_input("מה הבעיה או התחום שתרצה לחפש?", "")
+
+# --- כפתור הפעלה ---
 if st.button("Collect & Analyze"):
     if keyword.strip() == "":
         st.warning("אנא הזן מילה או תחום לחיפוש.")
     else:
         st.write(f"מחפש בעיות עם מילת מפתח: **{keyword}** ...")
 
+        # --- שליפת נתונים ממקורות שונים ---
         reddit_df = fetch_reddit_posts(["BuyItForLife", "LifeProTips"], days=7)
         trends_df = fetch_google_trends()
         tiktok_df = fetch_websearch(keyword, site="tiktok.com")
         quora_df = fetch_websearch(keyword, site="quora.com")
 
+        st.write(f"Reddit results: {len(reddit_df)}, Trends: {len(trends_df)}, TikTok: {len(tiktok_df)}, Quora: {len(quora_df)}")
+
         combined = merge_and_filter([reddit_df, trends_df, tiktok_df, quora_df])
         if combined.empty:
             st.warning("לא נמצאו בעיות עם מילת המפתח הזו.")
         else:
-            # ---- Limit to Top 1 problem to save tokens ----
+            # --- ניתוח רק בעיה אחת (Top 1) כדי לחסוך בטוקנים ---
             top_problem = combined.iloc[0]["text_clean"]
             st.write(f"### Top Problem Selected:\n{top_problem}")
 
-            # ---- GPT Analysis (one time only) ----
+            # --- קריאה ל-GPT ---
             gpt_result = analyze_problem(top_problem)
             st.write("**GPT raw output:**", gpt_result)
 
+            # --- עיבוד תוצאות GPT ---
             results = []
             for line in gpt_result.split("\n"):
                 if "Product" in line and "|" in line:
@@ -30,6 +50,7 @@ if st.button("Collect & Analyze"):
                     except Exception:
                         continue
 
+                    # --- חיפוש קישור ---
                     link = search_aliexpress(product_name)
                     if not link:
                         link = f"https://www.aliexpress.com/wholesale?SearchText={product_name.replace(' ', '%20')}"
@@ -40,6 +61,10 @@ if st.button("Collect & Analyze"):
                         "aliexpress_link": f"[Link]({link})"
                     })
 
-            output_df = pd.DataFrame(results)
-            st.markdown(output_df.to_markdown(index=False), unsafe_allow_html=True)
-            st.download_button("Download CSV", output_df.to_csv(index=False), "output.csv")
+            # --- הצגת פלט ---
+            if results:
+                output_df = pd.DataFrame(results)
+                st.markdown(output_df.to_markdown(index=False), unsafe_allow_html=True)
+                st.download_button("Download CSV", output_df.to_csv(index=False), "output.csv")
+            else:
+                st.warning("לא התקבלו מוצרים מתאימים.")
