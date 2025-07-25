@@ -25,11 +25,6 @@ def analyze_problem(problem_text):
     {{"product":"שם מוצר שלישי","match":85,"explanation":"למה המוצר מתאים"}}
   ]
 }}
-
-1. כתוב תחילה מה הדרך הטובה ביותר לפתור את הבעיה מהשורש (solution).
-2. הצע 3 מוצרים פיזיים ספציפיים (רק מוצרים אמיתיים שאפשר למצוא ב-AliExpress).
-3. הוסף לכל מוצר אחוז התאמה (match) והסבר קצר (explanation) למה הוא מתאים.
-4. אל תוסיף שום טקסט נוסף מחוץ ל-JSON!
     """
 
     try:
@@ -38,20 +33,10 @@ def analyze_problem(problem_text):
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4
         )
-        # שינוי קריאה למבנה החדש
         content = response.choices[0].message.content.strip()
-
-        # ניסיון לקרוא את הפלט כ-JSON
-        result = json.loads(content)
-        return result
+        return json.loads(content)
 
     except json.JSONDecodeError:
-        return {
-            "solution": "לא נמצא פתרון תקין (JSON Decode Error)",
-            "products": []
-        }
+        return {"solution": "לא נמצא פתרון תקין (JSON Decode Error)", "products": []}
     except Exception as e:
-        return {
-            "solution": f"שגיאה: {str(e)}",
-            "products": []
-        }
+        return {"solution": f"שגיאה: {str(e)}", "products": []}
