@@ -1,41 +1,24 @@
 import pandas as pd
 
 def merge_and_filter(dfs):
-    """
-    מאחד מספר DataFrames (או DataFrame יחיד) ומסנן כפילויות על בסיס הטקסט הנקי.
-    אם חסרות עמודות מסוימות – יוסיף אותן כברירת מחדל.
-    """
-    # תומך בקלט של DataFrame יחיד
-    if isinstance(dfs, pd.DataFrame):
-        dfs = [dfs]
+    # איחוד מסגרות נתונים
+    dfs = [df for df in dfs if df is not None and not df.empty]
+    if not dfs:
+        return pd.DataFrame()
 
-    # איחוד כל הנתונים
     df = pd.concat(dfs, ignore_index=True)
 
-    # אם חסרה עמודת text_clean – ניצור אותה על בסיס title אם קיים
-    if "text_clean" not in df.columns:
-        if "title" in df.columns:
-            df["text_clean"] = df["title"].fillna("")
-        else:
-            df["text_clean"] = ""
+    # מניעת כפילויות
+    df["text_clean"] = df["title"].fillna("") + " " + df["text"].fillna("")
+    df = df.drop_duplicates(subset="text_clean")
 
-    # אם חסרה עמודת title – ניצור אותה ריקה
-    if "title" not in df.columns:
-        df["title"] = df["text_clean"]
+    # חישוב מדדים
+    if "score" in df.columns:
+        df["engagement_score"] = df["score"].fillna(0)
+    else:
+        df["engagement_score"] = 0
 
-    # אם חסרה עמודת url – נוסיף ריקה
-    if "url" not in df.columns:
-        df["url"] = ""
+    freq = df["text_clean"].value_counts().to_dict()
+    df["frequency_score"] = df["text_clean"].apply(lambda x: freq.get(x, 1))
 
-    # אם חסרה עמודת source – נוסיף ערך כללי
-    if "source" not in df.columns:
-        df["source"] = "unknown"
-
-    # הסרת כפילויות
-    grouped = df.groupby("text_clean").agg({
-        "source": lambda x: list(set(x)),
-        "title": "first",
-        "url": "first"
-    }).reset_index()
-
-    return grouped
+    return df
