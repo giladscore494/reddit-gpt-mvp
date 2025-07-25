@@ -5,14 +5,40 @@ from fetch_reddit import fetch_reddit_posts
 from fetch_google_trends import fetch_google_trends
 from fetch_websearch import fetch_websearch
 from merge_and_filter import merge_and_filter
-from analyze_gpt import analyze_problem
+from analyze_gpt import analyze_problem  # כולל תמיכה בתרגום ואנלוגיות
 from fetch_google_link import search_aliexpress
+
+# --- פונקציה לבדוק טרנדיות ---
+def is_trending_topic(df, min_posts=10, min_score=50):
+    """
+    בודקת אם הנושא חם מספיק:
+    - min_posts: מינימום פוסטים בשבוע האחרון
+    - min_score: מינימום ממוצע אינטראקציות (upvotes/comments/views)
+    """
+    if df.empty:
+        return False
+    if len(df) < min_posts:
+        return False
+
+    # בדיקת אינטראקציה
+    if 'score' in df.columns:
+        avg_score = df['score'].mean()
+    elif 'upvotes' in df.columns:
+        avg_score = df['upvotes'].mean()
+    elif 'views' in df.columns:
+        avg_score = df['views'].mean()
+    else:
+        avg_score = 0
+
+    return avg_score >= min_score
 
 # --- כותרת האפליקציה ---
 st.title("Multi-Source Problem Finder → Product Ideas")
 
 # --- קלט מהמשתמש ---
 keyword = st.text_input("מה הבעיה או התחום שתרצה לחפש?", "")
+min_posts = st.slider("מינימום פוסטים בשבוע האחרון", 5, 50, 10)
+min_score = st.slider("מינימום אינטראקציות ממוצעות לפוסט", 10, 200, 50)
 
 # --- כפתור הפעלה ---
 if st.button("Collect & Analyze"):
@@ -21,7 +47,7 @@ if st.button("Collect & Analyze"):
     else:
         st.write(f"מחפש בעיות עם מילת מפתח: **{keyword}** ...")
 
-        # --- שליפת נתונים ממקורות שונים ---
+        # --- שליפת נתונים ממקורות שונים (שבוע אחרון) ---
         reddit_df = fetch_reddit_posts(["BuyItForLife", "LifeProTips"], days=7)
         trends_df = fetch_google_trends()
         tiktok_df = fetch_websearch(keyword, site="tiktok.com")
@@ -29,11 +55,14 @@ if st.button("Collect & Analyze"):
 
         st.write(f"Reddit results: {len(reddit_df)}, Trends: {len(trends_df)}, TikTok: {len(tiktok_df)}, Quora: {len(quora_df)}")
 
+        # --- מיזוג וסינון ---
         combined = merge_and_filter([reddit_df, trends_df, tiktok_df, quora_df])
-        if combined.empty:
-            st.warning("לא נמצאו בעיות עם מילת המפתח הזו.")
+
+        # --- בדיקת טרנדיות ---
+        if not is_trending_topic(combined, min_posts, min_score):
+            st.warning("הנושא לא בוער כרגע (פחות מדי פוסטים או טראפיק נמוך בשבוע האחרון).")
         else:
-            # --- חיפוש בעיות שרלוונטיות למילת החיפוש (תמיכה בעברית) ---
+            # --- חיפוש בעיות שרלוונטיות למילת החיפוש ---
             pattern = re.compile(re.escape(keyword), re.IGNORECASE)
             filtered = combined[combined["text_clean"].apply(lambda x: bool(pattern.search(str(x))))]
 
@@ -44,7 +73,7 @@ if st.button("Collect & Analyze"):
 
             st.write(f"### Top Problem Selected:\n{top_problem}")
 
-            # --- קריאה ל-GPT ---
+            # --- קריאה ל-GPT (כולל תרגום ואנלוגיה) ---
             gpt_result = analyze_problem(top_problem)
             st.write("**GPT raw output:**", gpt_result)
 
