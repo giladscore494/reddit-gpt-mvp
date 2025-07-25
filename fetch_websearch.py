@@ -1,20 +1,33 @@
 import requests
+from bs4 import BeautifulSoup
 import pandas as pd
 
-def fetch_websearch(query, site="tiktok.com", num=5):
-    q = f"site:{site} {query}"
-    url = f"https://duckduckgo.com/html/?q={q}"
+def fetch_websearch(query, site=None, limit=3):
+    """
+    חיפוש בגוגל עם אופציה להגביל לאתר ספציפי
+    - query: מילת חיפוש
+    - site: (אופציונלי) אתר מסוים לחיפוש (למשל "quora.com")
+    - limit: מספר תוצאות להחזיר
+    """
+    if site:
+        query = f"site:{site} {query}"
+
+    search_url = f"https://www.google.com/search?q={query}"
     headers = {"User-Agent": "Mozilla/5.0"}
-    r = requests.get(url, headers=headers)
-    results = []
-    for line in r.text.split('<a rel="nofollow" class="result__a" href="')[1:]:
-        link = line.split('"')[0]
-        results.append({
-            "source": f"Web ({site})",
-            "title": query,
-            "text": f"Found result for {query}",
-            "url": link
-        })
-        if len(results) >= num:
-            break
-    return pd.DataFrame(results)
+    response = requests.get(search_url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    links = []
+    for g in soup.select('a'):
+        href = g.get('href')
+        if href and "http" in href and "google.com" not in href:
+            links.append(href)
+            if len(links) >= limit:
+                break
+
+    return pd.DataFrame([{
+        "title": f"Web search result {i+1}",
+        "text": links[i],
+        "score": 1,
+        "text_clean": links[i]
+    } for i in range(len(links))])
