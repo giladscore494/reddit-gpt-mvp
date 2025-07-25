@@ -38,20 +38,19 @@ def analyze_problem(problem_text):
             messages=[{"role": "user", "content": prompt}],
             temperature=0.4
         )
-        content = response.choices[0].message["content"].strip()
+        # שינוי קריאה למבנה החדש
+        content = response.choices[0].message.content.strip()
 
         # ניסיון לקרוא את הפלט כ-JSON
         result = json.loads(content)
         return result
 
     except json.JSONDecodeError:
-        # אם הפלט לא היה JSON תקין
         return {
-            "solution": "לא נמצא פתרון תקין",
+            "solution": "לא נמצא פתרון תקין (JSON Decode Error)",
             "products": []
         }
     except Exception as e:
-        # בעיה אחרת (למשל ברשת או בהגדרות API)
         return {
             "solution": f"שגיאה: {str(e)}",
             "products": []
