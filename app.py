@@ -50,7 +50,11 @@ if st.button("Collect & Analyze"):
 
             # --- עיבוד תוצאות GPT ---
             results = []
+            goal_line = None
+
             for line in gpt_result.split("\n"):
+                if line.startswith("Goal:"):
+                    goal_line = line.replace("Goal:", "").strip()
                 if "Product" in line and "|" in line:
                     try:
                         product_name = line.split("|")[0].split(":")[1].strip()
@@ -58,20 +62,22 @@ if st.button("Collect & Analyze"):
                     except Exception:
                         continue
 
-                    # --- חיפוש קישור (קישור לחיץ) ---
-                    link = search_aliexpress(product_name)
-                    if not link:
-                        link = f"https://www.aliexpress.com/wholesale?SearchText={product_name.replace(' ', '%20')}"
+                    # קישור חיפוש מדויק יותר (שם המוצר במלואו)
+                    query = product_name.replace(" ", "+")
+                    link = f"https://www.aliexpress.com/wholesale?SearchText={query}"
+
                     results.append({
-                        "problem": top_problem,
-                        "product": product_name,
-                        "match_percent": score,
-                        "AliExpress Link": f"[🔗 Click Here]({link})"
+                        "Product": f"**{product_name}**",
+                        "Match": f"{score}%",
+                        "Link": f"[🔗 View Product]({link})"
                     })
 
-            # --- הצגת פלט (קישורים לחיצים) ---
+            # --- הצגת פלט ---
             if results:
+                if goal_line:
+                    st.write(f"### Goal identified by AI: {goal_line}")
                 output_df = pd.DataFrame(results)
+                st.write("### Recommended Products")
                 st.write(output_df.to_html(escape=False, index=False), unsafe_allow_html=True)
                 st.download_button("Download CSV", output_df.to_csv(index=False), "output.csv")
             else:
