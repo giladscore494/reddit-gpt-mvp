@@ -1,36 +1,48 @@
-import streamlit as st
-import praw
+import datetime
 import pandas as pd
-from datetime import datetime, timedelta
+import streamlit as st
 
-def fetch_reddit_posts(subreddits, keyword=None, days=7, limit=10):
-    reddit = praw.Reddit(
-        client_id=st.secrets["REDDIT_CLIENT_ID"],
-        client_secret=st.secrets["REDDIT_CLIENT_SECRET"],
-        user_agent="reddit-problem-finder"
-    )
+# מנסה לייבא את PRAW רק אם יש מפתחות Reddit
+try:
+    import praw
+    USE_REDDIT_API = True
+except ImportError:
+    USE_REDDIT_API = False
 
+from fetch_websearch import fetch_websearch
+
+def fetch_reddit_posts(keywords, days=7, limit=50):
+    """
+    מחזיר פוסטים רלוונטיים מ-Reddit לפי מילות מפתח.
+    אם יש מפתחות Reddit → משתמש ב-API.
+    אחרת → עושה חיפוש גוגל (Fallback).
+    """
     posts = []
-    after_timestamp = int((datetime.utcnow() - timedelta(days=days)).timestamp())
+    end_date = datetime.datetime.utcnow() - datetime.timedelta(days=days)
 
-    for subreddit_name in subreddits:
-        subreddit = reddit.subreddit(subreddit_name)
-        for post in subreddit.new(limit=50):
-            if post.created_utc < after_timestamp:
-                continue
-
-            text = f"{post.title} {post.selftext}"
-            if keyword and keyword.lower() not in text.lower():
-                continue
-
-            posts.append({
-                "title": post.title,
-                "text": post.selftext,
-                "score": post.score,
-                "text_clean": text
-            })
-
-            if len(posts) >= limit:
-                break
+    # מצב 1: שימוש ב-Reddit API (אם קיימים מפתחות)
+    if USE_REDDIT_API and "reddit" in st.secrets:
+        reddit = praw.Reddit(
+            client_id=st.secrets["reddit"]["client_id"],
+            client_secret=st.secrets["reddit"]["client_secret"],
+            user_agent=st.secrets["reddit"]["user_agent"]
+        )
+        for keyword in keywords:
+            subreddit = reddit.subreddit("all")
+            for post in subreddit.search(keyword, sort="new", time_filter="week", limit=limit):
+                if datetime.datetime.utcfromtimestamp(post.created_utc) > end_date:
+                    posts.append({
+                        "title": post.title,
+                        "text": post.selftext,
+                        "url": post.url,
+                        "source": "reddit"
+                    })
+    else:
+        # מצב 2: אין Reddit API → שימוש ב-Google Web Search
+        for keyword in keywords:
+            df = fetch_websearch(f"site:reddit.com {keyword}", limit=limit)
+            if not df.empty:
+                df["source"] = "reddit-google"
+                posts.extend(df.to_dict("records"))
 
     return pd.DataFrame(posts)
