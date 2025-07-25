@@ -8,6 +8,9 @@ def analyze_problem(problem_text):
     prompt = f"""
     You are a product research assistant.
 
+    If the input is in Hebrew, first translate it into English for research,
+    but always output product names in English (as found on AliExpress).
+
     Task:
     1. Find exactly 5 physical products from AliExpress that solve the problem: "{problem_text}".
     2. All products must be highly relevant to this problem (ignore unrelated categories completely).
