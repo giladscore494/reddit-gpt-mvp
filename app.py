@@ -1,60 +1,92 @@
 import streamlit as st
 import pandas as pd
-
 from fetch_reddit import fetch_reddit_posts
 from fetch_google_trends import fetch_google_trends
 from fetch_websearch import fetch_websearch
-from merge_and_filter import merge_and_filter
-from analyze_gpt import analyze_problem
 from daily_trends import fetch_daily_trends
+from merge_and_filter import merge_and_filter
+from analyze_gpt import analyze_problem, analyze_and_find_products
+from fetch_google_link import search_aliexpress
 
-st.set_page_config(page_title="Multi-Source Problem Finder → Product Ideas", layout="wide")
+st.set_page_config(page_title="Multi-Source Problem Finder → Product Ideas (AliExpress + Trend Check)", layout="wide")
 st.title("Multi-Source Problem Finder → Product Ideas (AliExpress + Trend Check + Daily Top 10)")
 
-# פונקציה להצגת מוצרים בצורה נקייה
-def display_products(products):
-    st.subheader("מוצרים מומלצים:")
-    for idx, p in enumerate(products, start=1):
-        st.write(f"**{idx}. {p['name']}** – התאמה {p['match']}% – [🔗 לחץ כאן]({p['link']})")
-        if p.get("desc"):
-            st.caption(p["desc"])
+# --- קלט מהמשתמש ---
+topic = st.text_input("מה הבעיה או התחום שתרצה לחפש?", "")
 
-# חיפוש מותאם אישית לפי מילת מפתח
-topic = st.text_input("מה הבעיה או התחום שתרצה לחפש?")
-if st.button("חפש פתרונות"):
-    if topic.strip():
-        st.write(f"מחפש בעיות עם מילת מפתח: {topic} ...")
+# --- כפתור טרנדים עולמיים ---
+if st.button("הצג 10 בעיות טרנדיות בשבוע האחרון"):
+    trending_problems = analyze_problem("top trending problems globally")
+    st.subheader("10 בעיות טרנדיות שניתן לפתור עם מוצרי AliExpress")
+    for idx, item in enumerate(trending_problems, 1):
+        if isinstance(item, dict):
+            problem = item.get("problem", "לא זמין")
+            link = item.get("link", "#")
+            st.markdown(f"**{idx}. {problem}** – [מוצר לדוגמה]({link})", unsafe_allow_html=True)
+        else:
+            st.markdown(f"**{idx}. {item}**", unsafe_allow_html=True)
 
-        # מקורות שונים (Reddit, Google Trends, TikTok, Quora)
+# --- עיבוד חיפוש מותאם אישית ---
+if st.button("בצע חיפוש מותאם"):
+    if topic.strip() == "":
+        st.warning("אנא הזן תחום או בעיה לחיפוש.")
+    else:
+        st.write(f"מחפש בעיות עם מילת מפתח: **{topic}** ...")
+
+        # חיפושים ממקורות שונים
         reddit_df = fetch_reddit_posts(["BuyItForLife", "LifeProTips"], keyword=topic, days=7, limit=5)
         trends_df = fetch_google_trends(topic)
-        tiktok_df = fetch_websearch(topic, site="tiktok.com", limit=3)
-        quora_df = fetch_websearch(topic, site="quora.com", limit=3)
+        web_df = fetch_websearch(topic, site="quora.com", limit=3)
 
-        combined = pd.concat([reddit_df, trends_df, tiktok_df, quora_df], ignore_index=True)
-        combined = merge_and_filter(combined)
+        # מיזוג וסינון
+        combined = merge_and_filter([reddit_df, trends_df, web_df])
 
         if combined.empty:
-            st.warning("לא נמצאו פוסטים רלוונטיים")
+            st.warning("לא נמצאו בעיות מספיק חמות או עם נפח חיפוש גבוה.")
         else:
-            st.write("נמצאו בעיות חוזרות שזוהו:")
-            st.write(combined["text_clean"].unique().tolist())
+            # ניתוח עם GPT למציאת מוצרים מתאימים
+            problems = combined["title"].tolist()
+            top_problem = problems[0] if problems else topic
+            st.write("**בעיות חוזרות שזוהו:**")
+            for p in problems[:5]:
+                st.markdown(f"- {p}")
 
-            # ניתוח פתרונות
-            recommended_products = analyze_problem(topic)
+            st.subheader("פתרון מהשורש:")
+            root_solution, recommended_products = analyze_and_find_products(top_problem)
+
+            st.write(root_solution if root_solution else "לא נמצאה תשובה תקינה")
+
+            st.subheader("מוצרים מומלצים:")
             if recommended_products:
-                display_products(recommended_products)
+                for prod in recommended_products:
+                    name = prod.get("product", "מוצר לא ידוע")
+                    match = prod.get("match", 0)
+                    desc = prod.get("description", "")
+                    link = search_aliexpress(name)
+                    st.markdown(
+                        f"""
+                        <div style="margin-bottom:20px; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                            <b>{name}</b> – התאמה {match}%<br>
+                            <span style="color:gray;font-size:14px">{desc}</span><br>
+                            <a href="{link}" target="_blank"
+                               style="color:white;background:#0073e6;padding:5px 10px;
+                               border-radius:5px;text-decoration:none;display:inline-block;margin-top:5px;">
+                               🔗 לחץ כאן
+                            </a>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
             else:
-                st.error("לא נמצאו מוצרים רלוונטיים לבעיה זו.")
+                st.write("לא נמצאו מוצרים מתאימים.")
 
-# כפתור להצגת 10 בעיות טרנדיות (לא קשור למילת החיפוש)
-if st.button("Top 10 בעיות טרנדיות השבוע"):
-    st.write("בודק טרנדים כלליים...")
-    daily_products = fetch_daily_trends()
-    if daily_products:
-        st.write("טופ 10 בעיות טרנדיות השבוע שניתן לפתור במוצר:")
-        for idx, item in enumerate(daily_products, start=1):
-            st.write(f"**{idx}. {item['problem']}** – [מוצר לדוגמה]({item['link']})")
-            st.caption(item['desc'])
-    else:
-        st.warning("לא נמצאו טרנדים זמינים כרגע.")
+        # הצגת מוצרים טרנדיים (Top 10) באופן כללי
+        st.subheader("טופ 10 מוצרים פופולריים היום (Google Trends):")
+        try:
+            daily_products = fetch_daily_trends()
+            if not daily_products.empty:
+                st.table(daily_products)
+            else:
+                st.write("Fallback: No live Google Trends available")
+        except Exception as e:
+            st.error(f"שגיאה בטעינת Google Trends: {e}")
