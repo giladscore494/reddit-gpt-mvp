@@ -2,52 +2,84 @@ import streamlit as st
 from openai import OpenAI
 from deep_translator import GoogleTranslator
 
-# --- אתחול לקוח OpenAI ---
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 def translate_if_needed(text):
-    """
-    מתרגם לעברית → אנגלית אם נדרש
-    """
+    """תרגום לעברית → אנגלית אם צריך"""
     if any("\u0590" <= c <= "\u05EA" for c in text):
         try:
             return GoogleTranslator(source='auto', target='en').translate(text)
         except Exception:
-            return text  # fallback אם אין תרגום
+            return text
     return text
 
-def analyze_problem(problem_text):
+def analyze_topics_and_problems(keyword, posts=None, mode="topics"):
     """
-    ניתוח בעיה → הצעת מוצרים עם אנלוגיות והבנת מטרות
+    mode='topics' → מוצא תתי נושאים לחיפוש
+    mode='problems' → מוצא בעיות חוזרות
     """
-    problem_english = translate_if_needed(problem_text)
+    keyword_en = translate_if_needed(keyword)
 
+    if mode == "topics":
+        prompt = f"""
+        The user is interested in '{keyword_en}'.
+        Generate up to 5 subtopics (short keywords) related to this field
+        that are likely to have current online discussions.
+        Return only comma-separated keywords.
+        """
+    else:  # problems
+        posts_text = "\n".join(posts[:20])
+        prompt = f"""
+        Analyze the following recent online posts:
+        {posts_text}
+
+        Find up to 3 recurring **problems** users mention related to '{keyword_en}'.
+        Return them as a simple bullet list (no explanations).
+        """
+
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=250,
+        temperature=0.3
+    )
+    content = response.choices[0].message.content.strip()
+    if mode == "topics":
+        return [t.strip() for t in content.split(",")]
+    else:
+        return [p.strip("-• ") for p in content.split("\n") if p.strip()]
+
+def analyze_solutions(problems):
+    """
+    מקבל בעיות ומחזיר פתרונות פיזיים (3 מוצרים בלבד)
+    """
+    problems_text = "\n".join(problems)
     prompt = f"""
-    You are a product research assistant.
+    Problems detected:
+    {problems_text}
 
-    Problem: "{problem_english}"
+    Suggest exactly 3 physical products from AliExpress
+    that solve these problems effectively.
+    For each product, provide:
+    - Product name
+    - Match score (0-100%)
 
-    1. Understand what the person actually wants to achieve (Goal).
-       Example: "nail polish is peeling" → Goal might be "make nail polish last longer".
-    2. Suggest **exactly 5 PHYSICAL products** from AliExpress that directly or indirectly solve the problem.
-    3. Each product must be practical, buyable, and highly relevant.
-    4. Assign a **match score (0-100%)** based on how well it solves the problem.
-    5. Be concise and specific (use product names likely to appear on AliExpress).
-
-    Output format:
-    Goal: <short description of goal>
-    Product 1: <Exact Product Name> | Match: <Score>%
-    Product 2: <Exact Product Name> | Match: <Score>%
-    Product 3: <Exact Product Name> | Match: <Score>%
-    Product 4: <Exact Product Name> | Match: <Score>%
-    Product 5: <Exact Product Name> | Match: <Score>%
+    Return JSON like:
+    [
+      {{"product": "Example Product 1", "match": 95}},
+      {{"product": "Example Product 2", "match": 90}},
+      {{"product": "Example Product 3", "match": 85}}
+    ]
     """
 
     response = client.chat.completions.create(
         model="gpt-3.5-turbo",
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=400,
+        max_tokens=250,
         temperature=0.4
     )
-
-    return response.choices[0].message.content.strip()
+    import json
+    try:
+        return json.loads(response.choices[0].message.content)
+    except:
+        return []
