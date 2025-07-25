@@ -1,19 +1,38 @@
 import streamlit as st
 from openai import OpenAI
+from deep_translator import GoogleTranslator
 
-# אתחול לקוח OpenAI עם מפתח מה-Secrets
+# --- אתחול לקוח OpenAI ---
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
+def translate_if_needed(text):
+    """
+    מתרגם לעברית → אנגלית אם נדרש
+    """
+    if any("\u0590" <= c <= "\u05EA" for c in text):
+        try:
+            return GoogleTranslator(source='auto', target='en').translate(text)
+        except Exception:
+            return text  # fallback אם אין תרגום
+    return text
+
 def analyze_problem(problem_text):
+    """
+    ניתוח בעיה → הצעת מוצרים עם אנלוגיות והבנת מטרות
+    """
+    problem_english = translate_if_needed(problem_text)
+
     prompt = f"""
     You are a product research assistant.
 
-    1. Understand what the user actually wants to achieve (goal).
-       - If input is in Hebrew, translate it into English to understand the goal.
-    2. Suggest exactly 5 PHYSICAL products from AliExpress
-       that directly or indirectly solve the problem or help achieve the goal.
-    3. Products should be practical, buyable, and highly relevant.
-    4. Output must include match score (0-100%) that represents how well the product solves the goal.
+    Problem: "{problem_english}"
+
+    1. Understand what the person actually wants to achieve (Goal).
+       Example: "nail polish is peeling" → Goal might be "make nail polish last longer".
+    2. Suggest **exactly 5 PHYSICAL products** from AliExpress that directly or indirectly solve the problem.
+    3. Each product must be practical, buyable, and highly relevant.
+    4. Assign a **match score (0-100%)** based on how well it solves the problem.
+    5. Be concise and specific (use product names likely to appear on AliExpress).
 
     Output format:
     Goal: <short description of goal>
@@ -30,4 +49,5 @@ def analyze_problem(problem_text):
         max_tokens=400,
         temperature=0.4
     )
+
     return response.choices[0].message.content.strip()
