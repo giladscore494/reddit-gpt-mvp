@@ -1,29 +1,40 @@
-import openai
-from deep_translator import GoogleTranslator
-import streamlit as st
-from fetch_google_link import search_aliexpress
+# analyze_gpt.py
+from openai import OpenAI
 
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+# יצירת לקוח OpenAI פעם אחת בלבד
+client = OpenAI()
 
-def analyze_problem(problem_text):
+def analyze_problem(problem_text: str):
     """
-    מתרגם בעיה, מבצע אנלוגיה למציאת מוצר מתאים ב-90%+ התאמה.
+    מקבל בעיה (problem_text) ומחזיר ניתוח:
+    product - רעיון לפתרון
+    link - קישור מתאים (דמיוני כרגע)
     """
-    translated = GoogleTranslator(source='auto', target='en').translate(problem_text)
+    try:
+        # קריאה ל-OpenAI עם ה-API החדש
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "אתה עוזר לדרופשיפינג שמוצא בעיות ומייצר פתרונות."},
+                {"role": "user", "content": f"מצא מוצר מתאים לבעיה הבאה: {problem_text} \
+                והצג אותו בפורמט: מוצר: <שם מוצר>, קישור: <url>"}
+            ],
+            temperature=0.4
+        )
 
-    prompt = f"""
-You are a product sourcing expert. A user problem is described: "{translated}".
-Find ONE AliExpress product that solves it effectively. 
-Return product name only, 90%+ match required.
-    """
+        # פענוח תוצאה מהתשובה
+        content = response.choices[0].message.content
+        # פיצול פשוט – אפשר לשפר בהמשך
+        if "קישור:" in content:
+            product_part, link_part = content.split("קישור:")
+            product = product_part.replace("מוצר:", "").strip()
+            link = link_part.strip()
+        else:
+            product, link = content, "https://example.com"
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=100,
-        temperature=0.4
-    )
+        return product, link
 
-    product_name = response.choices[0].message["content"].strip()
-    link = search_aliexpress(product_name)
-    return product_name, link
+    except Exception as e:
+        # טיפול בשגיאות
+        print(f"שגיאה בניתוח הבעיה: {e}")
+        return "לא זמין", "https://example.com"
