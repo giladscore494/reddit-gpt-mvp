@@ -1,68 +1,60 @@
 import streamlit as st
+import pandas as pd
+
+from fetch_reddit import fetch_reddit_posts
+from fetch_google_trends import fetch_google_trends
+from fetch_websearch import fetch_websearch
+from merge_and_filter import merge_and_filter
 from analyze_gpt import analyze_problem
-from fetch_google_link import search_aliexpress
-from trend_check import get_trend_score
 from daily_trends import fetch_daily_trends
 
+st.set_page_config(page_title="Multi-Source Problem Finder → Product Ideas", layout="wide")
 st.title("Multi-Source Problem Finder → Product Ideas (AliExpress + Trend Check + Daily Top 10)")
 
+# פונקציה להצגת מוצרים בצורה נקייה
+def display_products(products):
+    st.subheader("מוצרים מומלצים:")
+    for idx, p in enumerate(products, start=1):
+        st.write(f"**{idx}. {p['name']}** – התאמה {p['match']}% – [🔗 לחץ כאן]({p['link']})")
+        if p.get("desc"):
+            st.caption(p["desc"])
+
+# חיפוש מותאם אישית לפי מילת מפתח
 topic = st.text_input("מה הבעיה או התחום שתרצה לחפש?")
+if st.button("חפש פתרונות"):
+    if topic.strip():
+        st.write(f"מחפש בעיות עם מילת מפתח: {topic} ...")
 
-def format_products(products):
-    html = "<h3>מוצרים מומלצים:</h3>"
-    for item in products:
-        html += f"""
-        <div style="margin-bottom:20px; padding:10px; border:1px solid #ddd; border-radius:8px;">
-            <b>{item['name']}</b> – התאמה {item['match']}% ({item['trend']})<br>
-            <span style="color:gray;font-size:14px">{item['explanation']}</span><br>
-            <a href="{item['link']}" target="_blank"
-               style="color:white;background:#0073e6;padding:5px 10px;
-               border-radius:5px;text-decoration:none;display:inline-block;margin-top:5px;">
-               🔗 לחץ כאן
-            </a>
-        </div>
-        """
-    return html
+        # מקורות שונים (Reddit, Google Trends, TikTok, Quora)
+        reddit_df = fetch_reddit_posts(["BuyItForLife", "LifeProTips"], keyword=topic, days=7, limit=5)
+        trends_df = fetch_google_trends(topic)
+        tiktok_df = fetch_websearch(topic, site="tiktok.com", limit=3)
+        quora_df = fetch_websearch(topic, site="quora.com", limit=3)
 
-def format_daily_trends(trends):
-    html = "<h3>טופ 10 מוצרים פופולריים היום (Google Trends):</h3>"
-    for t in trends:
-        link = search_aliexpress(t)
-        html += f"""
-        <div style="margin-bottom:10px;">
-            <b>{t}</b><br>
-            <a href="{link}" target="_blank"
-               style="color:white;background:#0073e6;padding:3px 7px;
-               border-radius:5px;text-decoration:none;display:inline-block;margin-top:2px;">
-               🔗 לחץ כאן
-            </a>
-        </div>
-        """
-    return html
+        combined = pd.concat([reddit_df, trends_df, tiktok_df, quora_df], ignore_index=True)
+        combined = merge_and_filter(combined)
 
-if st.button("Analyze Problem") and topic:
-    with st.spinner("מחפש ומנתח פתרונות..."):
-        analysis = analyze_problem(topic)
-        problems = analysis.get("problems", [])
-        products = analysis.get("products", [])
+        if combined.empty:
+            st.warning("לא נמצאו פוסטים רלוונטיים")
+        else:
+            st.write("נמצאו בעיות חוזרות שזוהו:")
+            st.write(combined["text_clean"].unique().tolist())
 
-        # הוספת לינקים וטרנדיות למוצרים
-        result_list = []
-        for p in products:
-            name = p["product"]
-            trend = get_trend_score(name)
-            link = search_aliexpress(name)
-            result_list.append({
-                "name": name,
-                "match": p["match"],
-                "explanation": p["explanation"],
-                "link": link,
-                "trend": trend
-            })
+            # ניתוח פתרונות
+            recommended_products = analyze_problem(topic)
+            if recommended_products:
+                display_products(recommended_products)
+            else:
+                st.error("לא נמצאו מוצרים רלוונטיים לבעיה זו.")
 
-        # טופ 10 יומיים
-        daily_products = fetch_daily_trends()
-
-        st.markdown(f"<h3>בעיות חוזרות שזוהו:</h3><ul>{''.join([f'<li>{x}</li>' for x in problems])}</ul>", unsafe_allow_html=True)
-        st.markdown(format_products(result_list), unsafe_allow_html=True)
-        st.markdown(format_daily_trends(daily_products), unsafe_allow_html=True)
+# כפתור להצגת 10 בעיות טרנדיות (לא קשור למילת החיפוש)
+if st.button("Top 10 בעיות טרנדיות השבוע"):
+    st.write("בודק טרנדים כלליים...")
+    daily_products = fetch_daily_trends()
+    if daily_products:
+        st.write("טופ 10 בעיות טרנדיות השבוע שניתן לפתור במוצר:")
+        for idx, item in enumerate(daily_products, start=1):
+            st.write(f"**{idx}. {item['problem']}** – [מוצר לדוגמה]({item['link']})")
+            st.caption(item['desc'])
+    else:
+        st.warning("לא נמצאו טרנדים זמינים כרגע.")
