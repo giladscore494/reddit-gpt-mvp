@@ -1,28 +1,20 @@
-import requests
-from bs4 import BeautifulSoup
-import urllib.parse
+import pandas as pd
 
-def search_aliexpress(product_name):
-    """
-    חיפוש מוצר באליאקספרס לפי שם מדויק, מחזיר קישור לחיץ.
-    אם לא נמצאה תוצאה ישירה → מחזיר קישור חיפוש בסיסי.
-    """
-    query = urllib.parse.quote_plus(product_name)
-    search_url = f"https://www.aliexpress.com/wholesale?SearchText={query}"
-    headers = {"User-Agent": "Mozilla/5.0"}
+def merge_and_filter(dfs):
+    # מיזוג כל הנתונים לרשימה אחת
+    df = pd.concat(dfs, ignore_index=True)
 
-    try:
-        r = requests.get(search_url, headers=headers, timeout=5)
-        if r.status_code == 200:
-            soup = BeautifulSoup(r.text, "html.parser")
-            first_link = soup.select_one("a[href*='item']")
-            if first_link and first_link.get("href"):
-                link = first_link.get("href")
-                if not link.startswith("http"):
-                    link = "https:" + link
-                return link
-    except Exception:
-        pass
+    # הבטחת קיום עמודות בסיס
+    if "source" not in df.columns:
+        df["source"] = "unknown"
+    if "url" not in df.columns:
+        df["url"] = df["text_clean"]
 
-    # fallback: החזרת קישור חיפוש ישיר
-    return search_url
+    # קיבוץ כדי למנוע כפילויות
+    grouped = df.groupby('text_clean').agg({
+        'source': lambda x: list(set(x)),
+        'title': 'first',
+        'url': 'first'
+    }).reset_index()
+
+    return grouped
