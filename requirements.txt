@@ -1,8 +1,6 @@
 streamlit
-praw
 pandas
-openai>=1.0.0
-requests
+openai
+deep_translator
 beautifulsoup4
-pytrends
-tabulate
+requests
