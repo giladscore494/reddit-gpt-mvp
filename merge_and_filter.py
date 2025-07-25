@@ -1,24 +1,26 @@
 import pandas as pd
 
 def merge_and_filter(dfs):
-    # איחוד מסגרות נתונים
-    dfs = [df for df in dfs if df is not None and not df.empty]
-    if not dfs:
-        return pd.DataFrame()
+    """
+    מאחד את כל מקורות המידע, מסנן כפילויות, מוסיף ספירת הופעות לכל בעיה.
+    """
+    # איחוד כל המסגרות
+    df = pd.concat([d for d in dfs if not d.empty], ignore_index=True)
 
-    df = pd.concat(dfs, ignore_index=True)
+    # אם אין נתונים
+    if df.empty:
+        return df
 
-    # מניעת כפילויות
+    # איחוד טקסט
     df["text_clean"] = df["title"].fillna("") + " " + df["text"].fillna("")
-    df = df.drop_duplicates(subset="text_clean")
 
-    # חישוב מדדים
-    if "score" in df.columns:
-        df["engagement_score"] = df["score"].fillna(0)
-    else:
-        df["engagement_score"] = 0
+    # ספירה כמה פעמים הופיעה כל בעיה (title)
+    freq = df.groupby("title").size().reset_index(name="post_count")
 
-    freq = df["text_clean"].value_counts().to_dict()
-    df["frequency_score"] = df["text_clean"].apply(lambda x: freq.get(x, 1))
+    # מיזוג חזרה
+    df = df.merge(freq, on="title", how="left")
+
+    # שמירת עמודות נדרשות בלבד
+    df = df[["title", "text", "url", "source", "post_count"]].drop_duplicates()
 
     return df
