@@ -1,7 +1,19 @@
+# ממשק משתמש
 streamlit
+
+# עיבוד נתונים
 pandas
+
+# קריאות רשת
 requests
-openai
 beautifulsoup4
 feedparser
+
+# טרנדים
 pytrends
+
+# AI
+openai
+
+# שמירת קבצים
+python-dateutil
