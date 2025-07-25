@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import re
 from fetch_reddit import fetch_reddit_posts
 from fetch_google_trends import fetch_google_trends
 from fetch_websearch import fetch_websearch
@@ -32,8 +33,10 @@ if st.button("Collect & Analyze"):
         if combined.empty:
             st.warning("לא נמצאו בעיות עם מילת המפתח הזו.")
         else:
-            # --- חיפוש בעיות שרלוונטיות למילת החיפוש ---
-            filtered = combined[combined["text_clean"].str.contains(keyword, case=False, na=False)]
+            # --- חיפוש בעיות שרלוונטיות למילת החיפוש (תמיכה בעברית) ---
+            pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+            filtered = combined[combined["text_clean"].apply(lambda x: bool(pattern.search(str(x))))]
+
             if not filtered.empty:
                 top_problem = filtered.iloc[0]["text_clean"]
             else:
@@ -55,7 +58,7 @@ if st.button("Collect & Analyze"):
                     except Exception:
                         continue
 
-                    # --- חיפוש קישור ---
+                    # --- חיפוש קישור (קישור לחיץ) ---
                     link = search_aliexpress(product_name)
                     if not link:
                         link = f"https://www.aliexpress.com/wholesale?SearchText={product_name.replace(' ', '%20')}"
@@ -63,13 +66,13 @@ if st.button("Collect & Analyze"):
                         "problem": top_problem,
                         "product": product_name,
                         "match_percent": score,
-                        "aliexpress_link": f"[AliExpress Link]({link})"
+                        "AliExpress Link": f"[🔗 Click Here]({link})"
                     })
 
-            # --- הצגת פלט (ללא tabulate) ---
+            # --- הצגת פלט (קישורים לחיצים) ---
             if results:
                 output_df = pd.DataFrame(results)
-                st.dataframe(output_df)
+                st.write(output_df.to_html(escape=False, index=False), unsafe_allow_html=True)
                 st.download_button("Download CSV", output_df.to_csv(index=False), "output.csv")
             else:
                 st.warning("לא התקבלו מוצרים מתאימים.")
