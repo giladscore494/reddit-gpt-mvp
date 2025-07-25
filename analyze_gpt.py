@@ -1,8 +1,3 @@
-
----
-
-## **2. analyze_gpt.py**
-```python
 from openai import OpenAI
 import json
 import re
