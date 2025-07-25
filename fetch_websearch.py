@@ -1,33 +1,28 @@
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+import urllib.parse
 
-def fetch_websearch(query, site=None, limit=3):
+def fetch_forum_posts(query, num_results=20):
     """
-    חיפוש בגוגל עם אופציה להגביל לאתר ספציפי
-    - query: מילת חיפוש
-    - site: (אופציונלי) אתר מסוים לחיפוש (למשל "quora.com")
-    - limit: מספר תוצאות להחזיר
+    חיפוש בגוגל בפורומים (Quora + StackExchange)
     """
-    if site:
-        query = f"site:{site} {query}"
+    query += ' site:quora.com OR site:stackexchange.com'
+    query = urllib.parse.quote_plus(query)
+    url = f"https://www.google.com/search?q={query}&num={num_results}"
 
-    search_url = f"https://www.google.com/search?q={query}"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(search_url, headers=headers)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+    }
+
+    response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, "html.parser")
 
-    links = []
-    for g in soup.select('a'):
-        href = g.get('href')
-        if href and "http" in href and "google.com" not in href:
-            links.append(href)
-            if len(links) >= limit:
-                break
+    results = []
+    for g in soup.select(".tF2Cxc"):
+        title = g.select_one("h3").text if g.select_one("h3") else "No title"
+        link = g.select_one("a")["href"] if g.select_one("a") else ""
+        snippet = g.select_one(".VwiC3b").text if g.select_one(".VwiC3b") else ""
+        results.append({"title": title, "link": link, "snippet": snippet})
 
-    return pd.DataFrame([{
-        "title": f"Web search result {i+1}",
-        "text": links[i],
-        "score": 1,
-        "text_clean": links[i]
-    } for i in range(len(links))])
+    return pd.DataFrame(results)
