@@ -1,40 +1,31 @@
-# analyze_gpt.py
-from openai import OpenAI
+import openai
+import streamlit as st
 
-# יצירת לקוח OpenAI פעם אחת בלבד
-client = OpenAI()
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-def analyze_problem(problem_text: str):
+def analyze_and_find_products(problem):
     """
-    מקבל בעיה (problem_text) ומחזיר ניתוח:
-    product - רעיון לפתרון
-    link - קישור מתאים (דמיוני כרגע)
+    שולח את הבעיה ל-GPT ומבקש פתרונות מוצר עם התאמה ≥ 90%.
     """
+    prompt = f"""
+    הבעיה: "{problem}"
+    מצא מוצר אחד בלבד שיכול לפתור את הבעיה הזו וודא שהוא מוצר פיזי שניתן לקנות.
+    החזר פורמט JSON: 
+    [{{"product": "שם מוצר", "match": 95, "link": "https://www.aliexpress.com/wholesale?SearchText=שם מוצר באנגלית"}}]
+    """
+
     try:
-        # קריאה ל-OpenAI עם ה-API החדש
-        response = client.chat.completions.create(
+        response = openai.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "אתה עוזר לדרופשיפינג שמוצא בעיות ומייצר פתרונות."},
-                {"role": "user", "content": f"מצא מוצר מתאים לבעיה הבאה: {problem_text} \
-                והצג אותו בפורמט: מוצר: <שם מוצר>, קישור: <url>"}
-            ],
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200,
             temperature=0.4
         )
 
-        # פענוח תוצאה מהתשובה
-        content = response.choices[0].message.content
-        # פיצול פשוט – אפשר לשפר בהמשך
-        if "קישור:" in content:
-            product_part, link_part = content.split("קישור:")
-            product = product_part.replace("מוצר:", "").strip()
-            link = link_part.strip()
-        else:
-            product, link = content, "https://example.com"
-
-        return product, link
-
+        raw = response.choices[0].message["content"]
+        import json
+        products = json.loads(raw)
+        return products
     except Exception as e:
-        # טיפול בשגיאות
-        print(f"שגיאה בניתוח הבעיה: {e}")
-        return "לא זמין", "https://example.com"
+        print("Error in GPT product analysis:", e)
+        return []
