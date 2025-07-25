@@ -1,48 +1,73 @@
-import datetime
+import requests
 import pandas as pd
-import streamlit as st
+import time
 
-# מנסה לייבא את PRAW רק אם יש מפתחות Reddit
+# -------- אפשרות שימוש ב-PRAW כגיבוי --------
 try:
     import praw
-    USE_REDDIT_API = True
+    USE_PRAW = True
 except ImportError:
-    USE_REDDIT_API = False
+    USE_PRAW = False
 
-from fetch_websearch import fetch_websearch
-
-def fetch_reddit_posts(keywords, days=7, limit=50):
+# ---- פונקציה עיקרית ----
+def fetch_reddit_posts(keywords, days=7, use_pushshift=True, praw_client=None):
     """
-    מחזיר פוסטים רלוונטיים מ-Reddit לפי מילות מפתח.
-    אם יש מפתחות Reddit → משתמש ב-API.
-    אחרת → עושה חיפוש גוגל (Fallback).
+    מחזיר פוסטים לפי מילות מפתח מ-Reddit.
+    ברירת מחדל: Pushshift API (לא מוגבל כמעט).
+    אם use_pushshift=False או Pushshift לא עבד → PRAW (דורש client).
+    """
+    if use_pushshift:
+        try:
+            return fetch_from_pushshift(keywords, days)
+        except Exception as e:
+            print(f"Pushshift API error: {e}")
+            if USE_PRAW and praw_client:
+                return fetch_from_praw(keywords, praw_client)
+            else:
+                return pd.DataFrame()
+    else:
+        if USE_PRAW and praw_client:
+            return fetch_from_praw(keywords, praw_client)
+        else:
+            print("PRAW client not available!")
+            return pd.DataFrame()
+
+
+def fetch_from_pushshift(keywords, days=7):
+    """
+    חיפוש ב-Pushshift (ללא מפתח)
+    """
+    query = " ".join(keywords)
+    url = f"https://api.pushshift.io/reddit/search/submission/?q={query}&after={days}d&size=50"
+    response = requests.get(url, timeout=10)
+    data = response.json().get("data", [])
+    if not data:
+        return pd.DataFrame()
+    posts = [
+        {
+            "title": p.get("title", ""),
+            "text": p.get("selftext", ""),
+            "score": p.get("score", 0),
+            "subreddit": p.get("subreddit", "")
+        }
+        for p in data
+    ]
+    return pd.DataFrame(posts)
+
+
+def fetch_from_praw(keywords, praw_client):
+    """
+    חיפוש עם PRAW (דורש client_id, client_secret, user_agent)
     """
     posts = []
-    end_date = datetime.datetime.utcnow() - datetime.timedelta(days=days)
-
-    # מצב 1: שימוש ב-Reddit API (אם קיימים מפתחות)
-    if USE_REDDIT_API and "reddit" in st.secrets:
-        reddit = praw.Reddit(
-            client_id=st.secrets["reddit"]["client_id"],
-            client_secret=st.secrets["reddit"]["client_secret"],
-            user_agent=st.secrets["reddit"]["user_agent"]
-        )
-        for keyword in keywords:
-            subreddit = reddit.subreddit("all")
-            for post in subreddit.search(keyword, sort="new", time_filter="week", limit=limit):
-                if datetime.datetime.utcfromtimestamp(post.created_utc) > end_date:
-                    posts.append({
-                        "title": post.title,
-                        "text": post.selftext,
-                        "url": post.url,
-                        "source": "reddit"
-                    })
-    else:
-        # מצב 2: אין Reddit API → שימוש ב-Google Web Search
-        for keyword in keywords:
-            df = fetch_websearch(f"site:reddit.com {keyword}", limit=limit)
-            if not df.empty:
-                df["source"] = "reddit-google"
-                posts.extend(df.to_dict("records"))
-
+    for kw in keywords:
+        subreddit = praw_client.subreddit("all")
+        for post in subreddit.search(kw, limit=50):
+            posts.append({
+                "title": post.title,
+                "text": post.selftext,
+                "score": post.score,
+                "subreddit": str(post.subreddit)
+            })
+            time.sleep(1)  # הגבלת קצב כדי לא להיחסם
     return pd.DataFrame(posts)
