@@ -1,31 +1,42 @@
-from pytrends.request import TrendReq
+import requests
+import xml.etree.ElementTree as ET
 import re
+
+RSS_URL = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=US"
 
 def fetch_daily_trends():
     """
-    מחזיר את הטופ 10 החיפושים היומיים הפופולריים ביותר מגוגל טרנדס.
-    מסנן רק מונחים שנראים כמו מוצרים פיזיים.
+    מושך את הטופ 10 חיפושים יומיים מגוגל טרנדס (גרסת RSS).
+    מחזיר רשימת מונחים שנראים כמו מוצרים פיזיים בלבד.
     """
-    pytrends = TrendReq(hl='en-US', tz=360)
-    trending_today = pytrends.trending_searches(pn='united_states')
-    product_trends = []
+    try:
+        r = requests.get(RSS_URL, timeout=5)
+        if r.status_code == 200:
+            root = ET.fromstring(r.content)
+            items = root.findall(".//item/title")
+            terms = [t.text for t in items if t.text]
+            product_terms = []
+            for term in terms:
+                if is_product_like(term):
+                    product_terms.append(term)
+                if len(product_terms) >= 10:
+                    break
+            return product_terms
+    except Exception:
+        pass
 
-    for trend in trending_today[0].head(20):  # ניקח 20, אחר כך נסנן ל-10
-        if is_product_like(trend):
-            product_trends.append(trend)
-        if len(product_trends) >= 10:
-            break
-
-    return product_trends
+    # fallback במקרה של כשל
+    return ["Fallback: No live Google Trends available"]
 
 def is_product_like(query):
     """
     בדיקה בסיסית אם החיפוש נראה כמו מוצר (ולא שם של אדם/מקום).
-    אפשר לשפר בעתיד עם GPT או רשימת קטגוריות.
     """
     banned_keywords = ["Netflix", "YouTube", "Facebook", "Trump", "Biden", "TikTok"]
     if any(word.lower() in query.lower() for word in banned_keywords):
         return False
-    # אם יש מילה כללית של מוצר (watch, phone, shoes, car וכו')
-    product_keywords = ["watch", "phone", "laptop", "shoes", "bag", "headphones", "tv", "camera", "printer"]
+    product_keywords = [
+        "watch", "phone", "laptop", "shoes", "bag", "headphones", "tv",
+        "camera", "printer", "sofa", "desk", "table", "jacket"
+    ]
     return any(word in query.lower() for word in product_keywords) or bool(re.search(r"\d", query))
