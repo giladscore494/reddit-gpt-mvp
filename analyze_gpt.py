@@ -6,19 +6,18 @@ openai.api_key = st.secrets["OPENAI_API_KEY"]
 
 def analyze_problem(problem_text):
     """
-    מבצע אנליזה לבעיה:
-    1. מציע פתרון מהשורש (solution).
-    2. מחזיר 3 מוצרים פיזיים רלוונטיים (רק מוצרים שניתן למצוא ב-AliExpress).
-    3. מחזיר הסבר קצר לכל מוצר (explanation) ואחוז התאמה (match).
-    הפלט מובטח להיות JSON בלבד.
+    אנליזה לבעיה:
+    - מחזיר רשימת בעיות חוזרות שקשורות ישירות למוצרים פיזיים.
+    - מחזיר 3 מוצרים פיזיים רלוונטיים לפתרון.
+    - ללא פתרון מהשורש.
     """
 
     prompt = f"""
 הבעיה: {problem_text}
 
-החזר אך ורק פלט בפורמט JSON הבא, ללא טקסט חופשי נוסף:
+החזר פלט JSON בלבד:
 {{
-  "solution":"גישה כללית לפתרון מהשורש",
+  "problems":["בעיה 1","בעיה 2","בעיה 3"],
   "products":[
     {{"product":"שם מוצר ראשון","match":95,"explanation":"למה המוצר מתאים"}},
     {{"product":"שם מוצר שני","match":90,"explanation":"למה המוצר מתאים"}},
@@ -35,8 +34,7 @@ def analyze_problem(problem_text):
         )
         content = response.choices[0].message.content.strip()
         return json.loads(content)
-
     except json.JSONDecodeError:
-        return {"solution": "לא נמצא פתרון תקין (JSON Decode Error)", "products": []}
+        return {"problems": [], "products": []}
     except Exception as e:
-        return {"solution": f"שגיאה: {str(e)}", "products": []}
+        return {"problems": [], "products": [], "error": str(e)}
