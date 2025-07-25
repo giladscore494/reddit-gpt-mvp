@@ -1,9 +1,5 @@
 streamlit
 pandas
-openai
-deep_translator
-beautifulsoup4
 requests
-pytrends
+openai
 praw
-
