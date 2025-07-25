@@ -2,4 +2,6 @@ streamlit
 pandas
 requests
 openai
-praw
+beautifulsoup4
+feedparser
+pytrends
