@@ -1,42 +1,51 @@
-import requests
-import xml.etree.ElementTree as ET
-import re
+from pytrends.request import TrendReq
+from fetch_google_link import search_aliexpress
+from openai import OpenAI
+import streamlit as st
 
-RSS_URL = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=US"
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-def fetch_daily_trends():
+def fetch_weekly_problems():
     """
-    מושך את הטופ 10 חיפושים יומיים מגוגל טרנדס (גרסת RSS).
-    מחזיר רשימת מונחים שנראים כמו מוצרים פיזיים בלבד.
+    מחזיר רשימת 10 בעיות פופולריות מהשבוע האחרון
+    שאפשר לפתור עם מוצר מאלי אקספרס.
     """
     try:
-        r = requests.get(RSS_URL, timeout=5)
-        if r.status_code == 200:
-            root = ET.fromstring(r.content)
-            items = root.findall(".//item/title")
-            terms = [t.text for t in items if t.text]
-            product_terms = []
-            for term in terms:
-                if is_product_like(term):
-                    product_terms.append(term)
-                if len(product_terms) >= 10:
-                    break
-            return product_terms
+        pytrends = TrendReq(hl='en-US', tz=360)
+        trending_today = pytrends.trending_searches(pn='united_states')
+        keywords = trending_today[0].tolist()[:10]
     except Exception:
-        pass
+        return []
 
-    # fallback במקרה של כשל
-    return ["Fallback: No live Google Trends available"]
+    prompt = f"""
+    Given these trending topics: {keywords}
+    Identify if each represents a problem that can be solved by a product.
+    If not, skip it. 
+    For each valid problem, suggest one AliExpress product to solve it.
+    Output as JSON list of objects with keys: problem, product.
+    """
 
-def is_product_like(query):
-    """
-    בדיקה בסיסית אם החיפוש נראה כמו מוצר (ולא שם של אדם/מקום).
-    """
-    banned_keywords = ["Netflix", "YouTube", "Facebook", "Trump", "Biden", "TikTok"]
-    if any(word.lower() in query.lower() for word in banned_keywords):
-        return False
-    product_keywords = [
-        "watch", "phone", "laptop", "shoes", "bag", "headphones", "tv",
-        "camera", "printer", "sofa", "desk", "table", "jacket"
-    ]
-    return any(word in query.lower() for word in product_keywords) or bool(re.search(r"\d", query))
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4
+        )
+        output_text = response.choices[0].message.content
+    except Exception:
+        return []
+
+    results = []
+    for line in output_text.splitlines():
+        if "problem" in line.lower() and "product" in line.lower():
+            try:
+                # חיתוך פשוט – בלי תלות בפורמט מדויק
+                parts = line.split("product:")
+                problem = parts[0].replace("problem:", "").strip()
+                product = parts[1].strip()
+                link = search_aliexpress(product)
+                results.append({"problem": problem, "link": link})
+            except:
+                continue
+
+    return results
