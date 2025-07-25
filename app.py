@@ -1,4 +1,4 @@
-iimport streamlit as st
+import streamlit as st
 import pandas as pd
 from fetch_reddit import fetch_reddit_posts
 from fetch_google_trends import fetch_google_trends
