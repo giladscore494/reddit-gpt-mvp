@@ -4,3 +4,5 @@ openai
 deep_translator
 beautifulsoup4
 requests
+pytrends
+praw
