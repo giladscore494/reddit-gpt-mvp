@@ -1,48 +1,53 @@
+import openai
 import streamlit as st
-from openai import OpenAI
 from deep_translator import GoogleTranslator
-from fetch_google_link import search_aliexpress
 
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+def translate_to_english(text):
+    try:
+        return GoogleTranslator(source='auto', target='en').translate(text)
+    except Exception:
+        return text
 
 def analyze_problem(problem_text):
     """
-    מנתח בעיה ומחזיר:
-    - רשימת מוצרים (שם, אחוז התאמה, תיאור, קישור עלי אקספרס)
+    מפענח בעיה כללית ומחזיר תובנה בסיסית
     """
-    # תרגום לאנגלית לשיפור הבנת GPT
-    translated_problem = GoogleTranslator(source='auto', target='en').translate(problem_text)
-
+    translated = translate_to_english(problem_text)
     prompt = f"""
-You are a product solution expert.
-Given the following user problem: "{translated_problem}"
-
-1. Suggest 3-5 physical products that can effectively solve this problem.
-2. For each product, provide:
-   - Product name (short)
-   - Short description (1 sentence)
-   - Match percentage (0-100)
-
-Return as JSON list:
-[{{"name": "...", "desc": "...", "match": 90}}, ...]
-"""
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "system", "content": "You are a product solution AI."},
-                  {"role": "user", "content": prompt}],
-        temperature=0.5
+    Identify the root issue described here and summarize it in one short sentence:
+    "{translated}"
+    """
+    response = openai.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3
     )
+    return response.choices[0].message.content.strip()
 
-    # ניתוח פלט JSON של GPT
-    raw = response.choices[0].message.content.strip()
-    import json
-    try:
-        products = json.loads(raw)
-    except json.JSONDecodeError:
-        return []
+def analyze_and_find_products(problem_text):
+    """
+    מזהה פתרונות מוצרים אפשריים מעלי אקספרס ומדרג אותם לפי התאמה.
+    מחזיר רשימה עם מוצר, אחוז התאמה, ותיאור קצר.
+    """
+    translated = translate_to_english(problem_text)
+    prompt = f"""
+    The user described a problem: "{translated}".
+    Your task:
+    1. Suggest 3 concrete products that could solve this problem (physical items sold online, ideally from AliExpress).
+    2. Rank them by relevance (percent 0-100).
+    3. Provide a one-line reason for each.
 
-    # הוספת קישור עלי אקספרס לכל מוצר
-    for p in products:
-        p["link"] = search_aliexpress(p["name"])
-
-    return products
+    Respond in JSON array format like:
+    [
+      {{"product": "Product Name", "match": 95, "reason": "Why it helps"}},
+      ...
+    ]
+    """
+    response = openai.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.4
+    )
+    return response.choices[0].message.content.strip()
